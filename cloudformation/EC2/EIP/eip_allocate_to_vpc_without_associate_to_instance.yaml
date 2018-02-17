@@ -1,0 +1,29 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Elastic IP example for allocating IP without assigning to EC2 instance
+Parameters:
+  VPC:
+    Type: "AWS::EC2::VPC::Id"
+    Description: VPC to allocate to
+
+Resources:
+  EIP1:
+    Type: "AWS::EC2::EIP"
+    Properties:
+      Domain: !Ref VPC
+  EIP2:
+    Type: "AWS::EC2::EIP"
+    Properties:
+      Domain: !Ref VPC
+
+Outputs:
+  EIP1:
+    Description: Allocated EIP for EC2 instance example01 not assigned.
+    Value: !Ref EIP1
+    Export:
+      Name: EIP1
+  EIP2:
+    Description: Allocated EIP for EC2 instance example02 not assigned.
+    Value: !Ref EIP2
+    Export:
+      Name: EIP2
