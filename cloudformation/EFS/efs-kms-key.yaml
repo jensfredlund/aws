@@ -1,0 +1,54 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: KMS-key for EFS volume
+Parameters:
+  Environment:
+    AllowedValues:
+    - dev
+    - stage
+    - prod
+    Description: Name of environment to deploy to
+    Type: String
+
+Resources:
+  KeyAlias:
+    Properties:
+      AliasName:
+        Fn::Join:
+        - '-'
+        - - alias/efsvolume-key
+          - Ref: Environment
+      TargetKeyId:
+        Ref: KmsKey
+    Type: AWS::KMS::Alias
+
+  KmsKey:
+    Properties:
+      Description: KMS-key for EFS volume
+      Enabled: true
+      KeyPolicy:
+        Id: key-default-1
+        Statement:
+        - Action: kms:*
+          Effect: Allow
+          Principal:
+            AWS:
+              Fn::Join:
+              - ':'
+              - - 'arn:aws:iam:'
+                - Ref: AWS::AccountId
+                - root
+          Resource: '*'
+          Sid: Enable IAM User Permissions
+        Version: '2012-10-17'
+    Type: AWS::KMS::Key
+
+Outputs:
+  KmsKeyArn:
+    Description: KMS-key ARN for EFS volume
+    Value: !GetAtt KmsKey.Arn
+    Export:
+      Name: !Join
+        - '-'
+        - - kms-key-arn-efsvolume
+          - !Ref Environment

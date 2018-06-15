@@ -1,0 +1,112 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: EFS volume with mount points in 3 AZs
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues:
+    - dev
+    - stage
+    - prod
+    Description: Name of environment to deploy to
+  VolumeName:
+    Description: The name to be used for the EFS volume
+    Type: String
+    MinLength: '1'
+    Default: efs-volume
+
+# Start creating resources
+Resources:
+  EFSVolume:
+    Type: 'AWS::EFS::FileSystem'
+    Properties:
+      FileSystemTags:
+      - Key: Name
+        Value: 'efs-volume'
+      - Key: Role
+        Value: storage
+      - Key: Product
+        Value: myproduct
+      - Key: Environment
+        Value: !Ref Environment
+      PerformanceMode: generalPurpose
+      Encrypted: true
+      KmsKeyId:
+        Fn::ImportValue:
+          Fn::Join:
+          - '-'
+          - - kms-key-arn-efsvolume
+            - Ref: Environment
+
+  MountTargetA:
+    Type: 'AWS::EFS::MountTarget'
+    Properties:
+      FileSystemId: !Ref EFSVolume
+      SecurityGroups:
+        - !Ref MountTargetSecurityGroup
+      SubnetId:
+        Fn::ImportValue:
+          Fn::Join:
+          - "-"
+          - - subnet-a
+            - Ref: Environment
+
+  MountTargetB:
+    Type: 'AWS::EFS::MountTarget'
+    Properties:
+      FileSystemId: !Ref EFSVolume
+      SecurityGroups:
+        - !Ref MountTargetSecurityGroup
+      SubnetId:
+        Fn::ImportValue:
+          Fn::Join:
+          - "-"
+          - - subnet-b
+            - Ref: Environment
+
+  MountTargetC:
+    Type: 'AWS::EFS::MountTarget'
+    Properties:
+      FileSystemId: !Ref EFSVolume
+      SecurityGroups:
+        - !Ref MountTargetSecurityGroup
+      SubnetId:
+        Fn::ImportValue:
+          Fn::Join:
+          - "-"
+          - - subnet-c
+            - Ref: Environment
+
+
+  MountTargetSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: EFS backup volume SG with referencing SGs to allow communication to EFS
+      VpcId:
+        Fn::ImportValue:
+          Fn::Join:
+            - "-"
+            - - product01-vpc
+              - Ref: Environment
+
+
+  MountTargetSecurityGroupIngressEfs:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+          Description: Allow all instances with this security group to communicate with the EFS volume
+          GroupId: !Ref MountTargetSecurityGroup
+          IpProtocol: tcp
+          FromPort: '2049'
+          ToPort: '2049'
+          SourceSecurityGroupId: !Ref MountTargetSecurityGroup
+
+Outputs:
+  efsdns:
+    Description: EFS volume DNS name for external mount
+    Value: !Ref EFSVolume
+    Export:
+      Name: !Join [ "-", [ efs-volume-dnsname, !Ref Environment ] ]
+  efssg:
+    Description: EFS volume exported Security group
+    Value: !Ref MountTargetSecurityGroup
+    Export:
+      Name: !Join [ "-", [ efs-volume-sg, !Ref Environment ] ]
