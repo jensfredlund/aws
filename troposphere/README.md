@@ -3,5 +3,8 @@ Library to create AWS CloudFormation descriptions
 
 ## Installation
 ```
-$ pip install troposphere
+$ sudo apt install python3-pip
+```
+```
+$ pip3 install troposphere[policy]
 ```
