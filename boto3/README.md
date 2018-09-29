@@ -22,3 +22,28 @@ Then, set up a default region (in e.g. ~/.aws/config):
 [default]
 region=us-east-1
 ```
+
+### Interfaces
+Client:
+
+    low-level service access
+    generated from service description
+    exposes botocore client to the developer
+    typically maps 1:1 with the service API
+    snake-cased method names (e.g. ListBuckets API => list_buckets method)
+
+Resource:
+
+
+    higher-level, object-oriented API
+    generated from resource description
+    uses identifiers and attributes
+    has actions (operations on resources)
+    exposes subresources and collections
+
+
+Session:
+
+
+    stores configuration information (primarily credentials and selected region)
+    allows you to create service clients and resources
