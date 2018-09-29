@@ -23,6 +23,9 @@ Then, set up a default region (in e.g. ~/.aws/config):
 region=us-east-1
 ```
 
+### Boto3 documentation for each AWS service
+https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/index.html
+
 ### Interfaces
 Client:
 
