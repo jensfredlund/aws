@@ -1,0 +1,122 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Autoscaling example
+Parameters:
+  Environment:
+    Type: String
+    Description: Select environment
+    AllowedValues:
+    - lab
+    - dev
+    - stage
+    - prod
+    - standby
+  VPC:
+    Type: 'AWS::EC2::VPC::Id'
+    Description: VPC to use
+  InstanceType:
+    Type: String
+    Description: Instace type to use
+    Default: c5.xlarge
+    AllowedValues:
+    - t2.micro
+    - t2.small
+    - t2.medium
+    - t2.large
+    - c5.large
+    - c5.xlarge
+    - c5.2xlarge
+    - m5.large
+    - m5.xlarge
+    - m5.2xlarge
+    - m5.4xlarge
+    - m5.12xlarge
+  ImageId:
+    Type: String
+    Description: AMI to use
+    Default: ami-9e7f5be7
+  KeyName:
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    Description: SSH key to use
+
+Resources:
+
+  SecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Example SG
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+      # HTTP
+      - Description: Allow all HTTP
+        IpProtocol: tcp
+        CidrIp: 0.0.0.0/0
+        FromPort: 80
+        ToPort: 80
+
+
+  ElasticLoadBalancer:
+    Type: AWS::ElasticLoadBalancing::LoadBalancer
+    Properties:
+      AvailabilityZones: !GetAZs ''
+      CrossZone: true
+      Listeners:
+      - LoadBalancerPort: '80'
+        InstancePort: '80'
+        Protocol: HTTP
+      HealthCheck:
+        Target: HTTP:80/
+        HealthyThreshold: '3'
+        UnhealthyThreshold: '5'
+        Interval: '30'
+        Timeout: '5'
+
+  LaunchConfiguration:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      KeyName: !Ref KeyName
+      ImageId: !Ref ImageId
+      SecurityGroups:
+      - Ref: SecurityGroup
+      InstanceType: !Ref InstanceType
+      BlockDeviceMappings:
+        - DeviceName: "/dev/sda1"
+          Ebs:
+            VolumeType: "gp2"
+            VolumeSize: "30"
+      UserData:
+        Fn::Base64: !Sub |
+          #cloud-config
+          # Groups
+          groups:
+            - admin
+          # Users
+          users:
+            - name: jensf
+              gecos: Jens Fredlund
+              sudo: ALL=(ALL) NOPASSWD:ALL
+              shell: /bin/bash
+              groups: admin
+              ssh_import_id: None
+              lock_passwd: true
+              ssh_authorized_keys:
+                - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDQlBzBYagY4hKSw4J3imjojw3LYC4SZvZDLU81rChBbdcP8Mac9+aOx8iJSIzR9X+hq2TBWya2+qbNNNctaOo8FxgUhw2TdV7+5uNTsM9qe9ByAP8wvLrh2xyKfB0IPAOsMX/LBvYGtoYK7LUnd/zaYtEFEJM2S0TXxB4XjSFSrdy+UPfwkrenHnwd+opl1CgfhiZZ0JeeAB8hXTXH3LGzqJJ5hJ4s389bVyCg5BKqqqJ/zl+BUKd7THDYDRSyfSvShE7J0uyvTn4KO5H9zL/36ksZbm34ETGFn1rDoGq5cgpxMGAsXsFx3RwZ8xTu61ougXe5qG1FwuKKi1GJplEx jf@tzunami
+          packages:
+           - screen
+           - nfs-common
+           - ntp
+           - nginx
+
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AvailabilityZones:
+        Fn::GetAZs: ''
+      LaunchConfigurationName:
+        Ref: LaunchConfiguration
+      MinSize: '1'
+      MaxSize: '3'
+      LoadBalancerNames:
+      - Ref: ElasticLoadBalancer
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: 300
