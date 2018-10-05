@@ -59,7 +59,6 @@ Resources:
     Type: AWS::ElasticLoadBalancing::LoadBalancer
     Properties:
       Scheme: internal
-      #AvailabilityZones: !GetAZs ''
       Subnets:
         - Fn::ImportValue:
             Fn::Join:
