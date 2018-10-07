@@ -1,0 +1,215 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Auto Scaling on Internal Network Load Balancer
+Parameters:
+  Environment:
+    Type: String
+    Description: Select environment
+    AllowedValues:
+    - lab
+    - dev
+    - stage
+    - prod
+    - standby
+  VPC:
+    Type: 'AWS::EC2::VPC::Id'
+    Description: VPC to use
+  InstanceType:
+    Type: String
+    Description: Instace type to use
+    Default: t3.small
+    AllowedValues:
+    - t3.micro
+    - t3.small
+    - t3.medium
+    - t3.large
+    - c5.large
+    - c5.xlarge
+    - c5.2xlarge
+    - m5.large
+    - m5.xlarge
+    - m5.2xlarge
+    - m5.4xlarge
+    - m5.12xlarge
+  ImageId:
+    Type: String
+    Description: AMI to use
+    Default: ami-9e7f5be7
+  KeyName:
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    Description: SSH key to use
+    Default: company-dev-region
+
+Resources:
+
+  SecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName:
+        Fn::Join:
+          - "-"
+          - - product-service-sg
+            - Ref: Environment
+      GroupDescription: My Description
+      VpcId:
+        Ref: VPC
+      SecurityGroupIngress:
+      # SSH
+      - Description: ALL
+        IpProtocol: tcp
+        CidrIp: 0.0.0.0/0
+        FromPort: 22
+        ToPort: 22
+
+  LoadBalancer:
+    Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
+    Properties:
+      Name:
+        Fn::Join:
+          - "-"
+          - -product-service
+            - Ref: Environment
+      Scheme: 'internal'
+      Type: 'network'
+      IpAddressType: 'ipv4'
+      Subnets:
+      - Fn::ImportValue:
+          Fn::Join:
+            - "-"
+            - - product-data-subnet-a
+              - Ref: Environment
+      - Fn::ImportValue:
+          Fn::Join:
+            - "-"
+            - - product-data-subnet-b
+              - Ref: Environment
+      - Fn::ImportValue:
+          Fn::Join:
+            - "-"
+            - - product-data-subnet-c
+              - Ref: Environment
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+            - "-"
+            - - product-service
+              - Ref: Environment
+
+  LoadBalancerTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      UnhealthyThresholdCount: 3
+      HealthyThresholdCount: 3
+      HealthCheckProtocol: TCP
+      Name:
+        Fn::Join:
+          - '-'
+          - - product-service
+            - Ref: Environment
+      Protocol: TCP
+      Port: 22
+      VpcId:
+        Ref: VPC
+
+  LoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn:
+            Ref: LoadBalancerTargetGroup
+      LoadBalancerArn:
+        Ref: LoadBalancer
+      Port: 22
+      Protocol: TCP
+
+  LaunchConfiguration:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      KeyName:
+        Ref: KeyName
+      ImageId:
+        Ref: ImageId
+      SecurityGroups:
+      - Ref: SecurityGroup
+      InstanceType:
+        Ref: InstanceType
+      BlockDeviceMappings:
+        - DeviceName: "/dev/sda1"
+          Ebs:
+            VolumeType: "gp2"
+            VolumeSize: "30"
+      UserData:
+        'Fn::Base64':
+          Fn::Sub: |
+            #cloud-config
+            packages:
+              - rsync
+              - screen
+              - nfs-common
+              - ntp
+            runcmd:
+              - "ls -la"
+
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName:
+        Fn::Join:
+          - "-"
+          - - product-service
+            - Ref: Environment
+      AvailabilityZones:
+        Fn::GetAZs: ''
+      LaunchConfigurationName:
+        Ref: LaunchConfiguration
+      MinSize: '1'
+      MaxSize: '1'
+      HealthCheckType: EC2
+      HealthCheckGracePeriod: 0
+      VPCZoneIdentifier:
+        - Fn::ImportValue:
+            Fn::Join:
+              - "-"
+              - - product-data-subnet-a
+                - Ref: Environment
+        - Fn::ImportValue:
+            Fn::Join:
+              - "-"
+              - - product-data-subnet-b
+                - Ref: Environment
+        - Fn::ImportValue:
+            Fn::Join:
+              - "-"
+              - - product-data-subnet-c
+                - Ref: Environment
+      TargetGroupARNs:
+        - Ref: LoadBalancerTargetGroup
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+            - "-"
+            - - product-service
+              - Ref: Environment
+        PropagateAtLaunch: 'true'
+      - Key: Environment
+        Value:
+          Ref: Environment
+        PropagateAtLaunch: 'true'
+      - Key: Role
+        Value: storage
+        PropagateAtLaunch: 'true'
+      - Key: Product
+        Value: Foo
+        PropagateAtLaunch: 'true'
+      # Ansible
+      - Key:
+          Fn::Join:
+            - "-"
+            - - Login
+              - Ref: Environment
+        Value: 'True'
+        PropagateAtLaunch: 'true'
