@@ -1,0 +1,45 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'EKS Service Role'
+Parameters:
+  Environment:
+    Type: String
+    Description: Select environment
+    AllowedValues:
+    - lab
+    - dev
+    - stage
+    - prod
+    - standby
+
+Resources:
+
+  EKSRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: eks-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - eks.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSServicePolicy
+        - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+
+Outputs:
+
+  EKSRoleArn:
+    Description: The role that EKS will use to create AWS resources for Kubernetes clusters
+    Value:
+      Fn::GetAtt: EKSRole.Arn
+    Export:
+      Name: 
+        Fn::Join:
+          - "-"
+          - - eks-rolearn
+            - Ref: Environment

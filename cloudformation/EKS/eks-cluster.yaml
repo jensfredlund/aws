@@ -1,0 +1,84 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: EKS Control plane
+Parameters:
+  Environment:
+    Type: String
+    Description: Select environment
+    AllowedValues:
+    - lab
+    - dev
+    - stage
+    - prod
+    - standby
+  EKSClusterName:
+    Type: String
+    Description: EKS Cluster Name. Environment will be added to the name automatically
+    Default: eks-cluster
+  EKSversion:
+    Type: String
+    Description: EKS version
+    Default: "1.11"
+Resources:
+  EKSCluster:
+    Type: "AWS::EKS::Cluster"
+    Properties:
+      Name:
+        Fn::Join:
+          - "-"
+          - - Ref: EKSClusterName
+            - Ref: Environment
+      ResourcesVpcConfig:
+        SecurityGroupIds:
+          - Fn::ImportValue:
+              Fn::Join:
+                - "-"
+                - - eks-sg
+                  - Ref: Environment
+        SubnetIds:
+          - Fn::ImportValue:
+              Fn::Join:
+                - "-"
+                - - eks-subneta
+                  - Ref: Environment
+          - Fn::ImportValue:
+              Fn::Join:
+                - "-"
+                - - eks-subnetb
+                  - Ref: Environment
+          - Fn::ImportValue:
+              Fn::Join:
+                - "-"
+                - - eks-subnetc
+                  - Ref: Environment
+      Version:
+        Ref: EKSversion
+      RoleArn:
+        Fn::ImportValue:
+          Fn::Join:
+            - "-"
+            - - eks-rolearn
+              - Ref: Environment
+Outputs:
+  EKSClusterArn:
+    Description: EKS Cluster Arn
+    Value:
+      Fn::GetAtt: 'EKSCluster.Arn'
+    Export:
+      Name:
+        Fn::Join:
+          - '-'
+          - - Ref: EKSClusterName
+            - 'arn'
+            - Ref: 'Environment'
+  EKSClusterEndpoint:
+    Description: EKS Cluster Endpoint
+    Value:
+      Fn::GetAtt: 'EKSCluster.Endpoint'
+    Export:
+      Name:
+        Fn::Join:
+          - '-'
+          - - Ref: EKSClusterName
+            - 'endpoint'
+            - Ref: 'Environment'
