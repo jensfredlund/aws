@@ -1,0 +1,179 @@
+%YAML 1.1
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Product RDS
+Parameters:
+  DBInstanceClass:
+    Default: db.m5.large
+    Description: Database instance class
+    Type: String
+  Environment:
+    AllowedValues:
+      - dev
+      - stage
+      - prod
+      - standby
+    Description: Name of environment to deploy to
+    Type: String
+  MultiAZ:
+    Description: Multi AZ?
+    AllowedValues:
+      - true
+      - false
+    Default: true
+    Type: String
+  DiskSize:
+    Type: String
+    Description: RDS Disk size
+    Default: 30
+  BackupRetention:
+    Description: Keep backup for x days
+    Type: String
+    Default: 7
+    AllowedValues:
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
+      - 10
+      - 11
+      - 12
+      - 13
+      - 14
+  MasterUserPassword:
+    Description: Master password of RDS instance.
+    NoEcho: true
+    Type: String
+  MasterUsername:
+    Description: Master username of RDS instance.
+    Type: String
+
+Resources:
+
+  ParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Description: RDS Parameter Group
+      Family: postgres11
+      Parameters:
+        timezone: 'UTC'
+        log_statement: 'all'
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Join:
+              - '-'
+              - - product-paramgroup-ca
+                - Ref: Environment
+
+  RdsInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DeletionProtection: true
+      AllowMajorVersionUpgrade: false
+      AutoMinorVersionUpgrade: true
+      AllocatedStorage: !Ref DiskSize
+      BackupRetentionPeriod: !Ref BackupRetention
+      DBInstanceClass: !Ref DBInstanceClass
+      DBInstanceIdentifier:
+        Fn::Join:
+          - '-'
+          - - product-rds-ca
+            - Ref: Environment
+      DBParameterGroupName: !Ref ParameterGroup
+      DBSubnetGroupName: !Ref RdsSubnetGroup
+      Engine: postgres
+      EngineVersion: '11.1'
+      KmsKeyId:
+        Fn::ImportValue:
+          Fn::Join:
+            - '-'
+            - - product-kms-key-rds-shared
+              - Ref: Environment
+      MasterUserPassword: !Ref MasterUserPassword
+      MasterUsername: !Ref MasterUsername
+      MonitoringInterval: 60
+      MonitoringRoleArn:
+        Fn::GetAtt:
+          - RdsRole
+          - Arn
+      MultiAZ: !Ref MultiAZ
+      PubliclyAccessible: false
+      StorageEncrypted: true
+      StorageType: gp2
+      EnableCloudwatchLogsExports:
+        - postgresql
+        - upgrade
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Join:
+              - '-'
+              - - product-rds-label
+                - Ref: Environment
+        - Key: Environment
+          Value:
+            Ref: Environment
+        - Key: Product
+          Value: foobar
+        - Key: Tier
+          Value: data
+        - Key: Role
+          Value: application
+      VPCSecurityGroups:
+        - Fn::ImportValue:
+            Fn::Join:
+              - "-"
+              - - product-rds-label-sg
+                - Ref: Environment
+
+  RdsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - rds.amazonaws.com
+                - monitoring.rds.amazonaws.com
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole
+      Path: /
+      Policies: []
+
+  RdsSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Product RDS TLD Subnet Group
+      SubnetIds:
+        - Fn::ImportValue:
+            Fn::Join:
+              - '-'
+              - - product-data-subnet-a
+                - Ref: Environment
+        - Fn::ImportValue:
+            Fn::Join:
+              - '-'
+              - - product-data-subnet-b
+                - Ref: Environment
+        - Fn::ImportValue:
+            Fn::Join:
+              - '-'
+              - - product-data-subnet-c
+                - Ref: Environment
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Join:
+              - '-'
+              - - product-rds-subnet
+                - Ref: Environment
