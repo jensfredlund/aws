@@ -1,0 +1,44 @@
+%YAML 1.1
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: RDS Option group for MariaDB audit plugin
+Parameters:
+  Environment:
+    Description: Name of environment to deploy to
+    Type: String
+    AllowedValues:
+      - dev
+      - stage
+      - prod
+      - standby
+
+Resources:
+
+  AuditPluginOptionGroup:
+    Type: 'AWS::RDS::OptionGroup'
+    Properties:
+      EngineName: mysql
+      MajorEngineVersion: '5.7'
+      OptionGroupDescription: MariaDB audit plugin option group
+      OptionConfigurations:
+        - OptionName: MARIADB_AUDIT_PLUGIN
+          OptionSettings:
+            - Name: SERVER_AUDIT_FILE_ROTATE_SIZE
+              Value: '1000000'
+            - Name: SERVER_AUDIT_FILE_ROTATIONS
+              Value: '10'
+            - Name: SERVER_AUDIT_EXCL_USERS
+              Value: 'rdsadmin'
+      Tags:
+        - Key: Name
+          Value: mariadbaudit-plugin
+Outputs:
+  AuditPluginOptionGroupOutput:
+    Description: MariaDB Audit Plugin RDS Option Group
+    Value: !Ref AuditPluginOptionGroup
+    Export:
+      Name:
+        Fn::Join:
+          - "-"
+          - - rds-optionsgroup-auditplugin
+            - Ref: Environment
